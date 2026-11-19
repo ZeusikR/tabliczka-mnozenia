@@ -48,6 +48,17 @@ h1{margin:28px 0 14px;text-align:center;color:var(--cyan);font-size:30px;line-he
 #dots{height:44px;display:flex;align-items:center;justify-content:center;gap:14px}
 .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--white);background:transparent;padding:0;cursor:pointer}
 .dot.on{background:var(--white)}
+#streak{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin:-4px 0 10px;font-size:20px;font-weight:700;color:var(--white)}
+#streak .st{display:flex;align-items:center;gap:6px}
+#streak svg{width:28px;height:28px}
+#streak .prog{font-size:14px;color:var(--muted);font-weight:600}
+.modal{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(20,26,29,.88)}
+.modal.off{display:none}
+.card{width:100%;max-width:340px;padding:28px 22px;text-align:center;background:var(--bg);border:2px solid var(--cyan);border-radius:20px}
+.card svg{width:110px;height:110px;animation:pop .6s ease}
+.card h2{margin:12px 0 8px;color:var(--cyan);font-size:30px;line-height:1.15}
+.card p{margin:0 0 20px;font-size:18px;line-height:1.4}
+@keyframes pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion:reduce){#track{transition:none}}
 </style>
 </head>
@@ -56,6 +67,7 @@ h1{margin:28px 0 14px;text-align:center;color:var(--cyan);font-size:30px;line-he
   <div id="track">
     <section class="panel" aria-label="Test">
       <h1 id="title">Test nr. 1</h1>
+      <div id="streak"></div>
       <div id="list"></div>
       <div class="dock"><button class="btn hide" id="new1">Nowy Test</button></div>
     </section>
@@ -68,6 +80,9 @@ h1{margin:28px 0 14px;text-align:center;color:var(--cyan);font-size:30px;line-he
       <h1>Wyniki z 20 ostatnich testów</h1>
       <div id="hist"></div>
     </section>
+  </div>
+  <div id="modal" class="modal off" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="card"><div id="mIcon"></div><h2 id="mTitle"></h2><p id="mText"></p><button class="btn" id="mOk">Super!</button></div>
   </div>
   <div id="dots"></div>
 </div>
@@ -92,6 +107,7 @@ const store = {
 };
 let used = new Set(store.get("mn_used", []));   // wykorzystane kombinacje
 let history = store.get("mn_hist", []);         // [{n,good,bad}]
+let wins = store.get("mn_wins", 0);          // testy rozwiązane w 100% (nie muszą być pod rząd)
 let done = store.get("mn_done", 0);             // liczba ukończonych testów
 
 // ===== Losowanie testu bez powtórek =====
@@ -168,11 +184,14 @@ function finish(){
   const entry = {n: done, good, bad};
   const slotIdx = (done - 1) % HISTORY_SIZE;      // test nr 21 nadpisuje test nr 1 itd.
   history[slotIdx] = entry; store.set("mn_hist", history);
-  renderResult(); renderHistory();
+  let reward = false;
+  if(bad === 0){ wins++; store.set("mn_wins", wins); reward = wins % 10 === 0; }
+  renderResult(); renderHistory(); renderStreak();
   $("new1").classList.remove("hide");
   setTimeout(() => {
     go(1);
     play(bad === 0 ? SND.win : SND.lost);
+    if(reward) setTimeout(() => showReward(wins), 900);
   }, 1500);
 }
 
@@ -182,7 +201,8 @@ function renderResult(){
     '<div class="big">' + good + '/' + questions.length + '</div>' +
     '<div class="line">Dobrze: <b style="color:var(--good)">' + good + '</b></div>' +
     '<div class="line">Źle: <b style="color:var(--bad)">' + bad + '</b></div>' +
-    '<p class="sub">' + (perfect ? "Wygrana! 100% poprawnych odpowiedzi." : "Test nierozwiązany. Spróbuj jeszcze raz.") + '</p>';
+    '<p class="sub">' + (perfect ? "Wygrana! 100% poprawnych odpowiedzi." : "Test nierozwiązany. Spróbuj jeszcze raz.") + '</p>' +
+    (perfect ? '<p class="sub">Do następnej gwiazdki: ' + (10 - wins % 10) + '</p>' : '');
   $("new2").classList.remove("hide");
 }
 
@@ -192,6 +212,38 @@ function renderHistory(){
     '<div class="h"><span class="n">Test nr. ' + e.n + '</span><span class="g">✓ ' + e.good + '</span><span class="b">✗ ' + e.bad + '</span></div>'
   ).join("") : '<p class="empty">Brak ukończonych testów.</p>';
 }
+
+// ===== Nagrody: gwiazdki (co 10 wygranych) i puchary (100 / 200 / 300) =====
+const STAR = '<svg viewBox="0 0 24 24" fill="#ffc857" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
+const CUPS = [[300, "#ffd700", "Złoty"], [200, "#c0c8d0", "Srebrny"], [100, "#cd7f32", "Brązowy"]];
+function cup(w){ return CUPS.find(c => w >= c[0]) || null; }
+function cupSvg(color){
+  return '<svg viewBox="0 0 24 24" fill="' + color + '" aria-hidden="true"><path fill-rule="evenodd" d="M7 2h10v2h3a1 1 0 0 1 1 1v2a4 4 0 0 1-4 4h-.2A5 5 0 0 1 13 13.9V16h3v2h1v2H7v-2h1v-2h3v-2.1A5 5 0 0 1 7.2 11H7a4 4 0 0 1-4-4V5a1 1 0 0 1 1-1h3V2zM5 6v1a2 2 0 0 0 2 2V6H5zm14 0h-2v3a2 2 0 0 0 2-2V6z"/></svg>';
+}
+function renderStreak(){
+  const stars = Math.floor(wins / 10), c = cup(wins);
+  $("streak").innerHTML =
+    (stars ? '<span class="st" aria-label="Gwiazdki: ' + stars + '">' + STAR + 'x ' + stars + '</span>' : '') +
+    (c ? '<span class="st" aria-label="' + c[2] + ' puchar">' + cupSvg(c[1]) + '</span>' : '') +
+    '<span class="prog">' + (wins % 10) + '/10 do gwiazdki</span>';
+}
+function showReward(w){
+  const c = CUPS.find(x => x[0] === w), stars = w / 10;
+  if(c){
+    $("mIcon").innerHTML = cupSvg(c[1]);
+    $("mTitle").textContent = c[2] + " puchar!";
+    $("mText").textContent = w + " wygranych testów na 100%! Zdobywasz " + c[2].toLowerCase() + " puchar i kolejną gwiazdkę. Twoje gwiazdki: x " + stars + ".";
+  } else {
+    $("mIcon").innerHTML = STAR;
+    $("mTitle").textContent = "Gratulacje!";
+    $("mText").textContent = w + " wygranych testów na 100%! Zdobywasz gwiazdkę. Twoje gwiazdki: x " + stars + ".";
+  }
+  $("modal").classList.remove("off");
+  $("mOk").focus();
+}
+function closeReward(){ $("modal").classList.add("off"); $("new2").focus(); }
+$("mOk").addEventListener("click", closeReward);
+addEventListener("keydown", e => { if(e.key === "Escape" && !$("modal").classList.contains("off")) closeReward(); });
 
 // ===== Viewporty: kropki, przeciąganie =====
 let index = 0;
@@ -223,7 +275,7 @@ addEventListener("pointerdown", unlock, true); addEventListener("keydown", unloc
 
 $("new1").addEventListener("click", newTest);
 $("new2").addEventListener("click", newTest);
-renderHistory(); newTest();
+renderHistory(); renderStreak(); newTest();
 </script>
 <script>
 if("serviceWorker" in navigator){
