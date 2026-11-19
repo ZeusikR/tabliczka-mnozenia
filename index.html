@@ -58,6 +58,11 @@ h1{margin:28px 0 14px;text-align:center;color:var(--cyan);font-size:30px;line-he
 .card h2{margin:12px 0 8px;color:var(--cyan);font-size:30px;line-height:1.15}
 .card p{margin:0 0 20px;font-size:18px;line-height:1.4}
 @keyframes pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.upd{position:absolute;left:16px;right:16px;bottom:56px;z-index:9;display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--cyan);color:var(--bg);border-radius:12px;font-weight:700;font-size:15px}
+.upd.off{display:none}
+.upd span{flex:1}
+.upd button{font:700 14px Inter,sans-serif;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;background:var(--bg);color:var(--white)}
+.upd .x{background:transparent;color:var(--bg);font-size:20px;padding:4px 8px}
 @media (prefers-reduced-motion:reduce){#track{transition:none}}
 </style>
 </head>
@@ -82,6 +87,11 @@ h1{margin:28px 0 14px;text-align:center;color:var(--cyan);font-size:30px;line-he
   </div>
   <div id="modal" class="modal off" role="dialog" aria-modal="true" aria-labelledby="mTitle">
     <div class="card"><div id="mIcon"></div><h2 id="mTitle"></h2><p id="mText"></p><button class="btn" id="mOk">Super!</button></div>
+  </div>
+  <div id="update" class="upd off" role="status">
+    <span>Dostępna nowa wersja</span>
+    <button id="updBtn" type="button">Odśwież</button>
+    <button id="updLater" class="x" type="button" aria-label="Później">×</button>
   </div>
   <div id="dots"></div>
 </div>
@@ -278,7 +288,29 @@ renderHistory(); renderStreak(); newTest();
 </script>
 <script>
 if("serviceWorker" in navigator){
-  addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+  const hadController = !!navigator.serviceWorker.controller;
+  let waiting = null, reloading = false;
+  const banner = () => document.getElementById("update");
+  const offer = w => { waiting = w; banner().classList.remove("off"); };
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").then(reg => {
+      if(reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
+      reg.addEventListener("updatefound", () => {
+        const w = reg.installing;
+        if(!w) return;
+        w.addEventListener("statechange", () => {
+          if(w.state === "installed" && navigator.serviceWorker.controller) offer(w);
+        });
+      });
+      document.addEventListener("visibilitychange", () => { if(!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {});
+    document.getElementById("updBtn").addEventListener("click", () => { if(waiting) waiting.postMessage("SKIP_WAITING"); });
+    document.getElementById("updLater").addEventListener("click", () => banner().classList.add("off"));
+  });
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if(!hadController || reloading) return;
+    reloading = true; location.reload();
+  });
 }
 </script>
 </body>
