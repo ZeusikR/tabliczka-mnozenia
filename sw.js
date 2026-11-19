@@ -1,6 +1,6 @@
 // Service worker – aplikacja działa offline.
 // Po każdej zmianie plików podbij numer wersji, żeby użytkownicy dostali aktualizację.
-const VERSION = "v3";
+const VERSION = "v4";
 const CACHE = "mnozenie-" + VERSION;
 const PRECACHE = [
   "./",
@@ -13,7 +13,12 @@ const PRECACHE = [
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  // nie wołamy skipWaiting – nowa wersja czeka, aż użytkownik kliknie „Odśwież” w aplikacji
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE.map(u => new Request(u, { cache: "reload" })))));
+});
+
+self.addEventListener("message", e => {
+  if(e.data === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", e => {
