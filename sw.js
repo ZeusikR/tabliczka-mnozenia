@@ -1,6 +1,6 @@
 // Service worker – aplikacja działa offline.
 // Po każdej zmianie plików podbij numer wersji, żeby użytkownicy dostali aktualizację.
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = "mnozenie-" + VERSION;
 const PRECACHE = [
   "./",
